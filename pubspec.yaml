@@ -17,7 +17,7 @@ dependencies:
   speech_to_text: ^6.6.1
   sensors_plus: ^5.0.1
   shared_preferences: ^2.2.2
-  intl: 0.18.1
+  intl: ^0.20.3
 
   cupertino_icons: ^1.0.8
 
