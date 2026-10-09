@@ -8,6 +8,7 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sensors_plus/sensors_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,11 +17,13 @@ void main() async {
   bool isFirstTime = prefs.getBool('is_first_time') ?? true;
   String? secretaryName = prefs.getString('secretary_name');
   bool? isMale = prefs.getBool('is_male');
+  bool? isUserMale = prefs.getBool('is_user_male');
 
   runApp(SecretaryApp(
     isFirstTime: isFirstTime,
     savedName: secretaryName,
     savedIsMale: isMale,
+    savedIsUserMale: isUserMale,
   ));
 }
 
@@ -28,12 +31,14 @@ class SecretaryApp extends StatelessWidget {
   final bool isFirstTime;
   final String? savedName;
   final bool? savedIsMale;
+  final bool? savedIsUserMale;
 
   const SecretaryApp({
     super.key,
     required this.isFirstTime,
     this.savedName,
     this.savedIsMale,
+    this.savedIsUserMale,
   });
 
   @override
@@ -46,6 +51,7 @@ class SecretaryApp extends StatelessWidget {
       homeScreen = MainDashboard(
         secretaryName: savedName ?? 'أحمد',
         isMale: savedIsMale ?? true,
+        isUserMale: savedIsUserMale ?? true,
       );
     }
 
@@ -82,6 +88,16 @@ class TermsAndPermissionsScreen extends StatefulWidget {
 
 class _TermsAndPermissionsScreenState extends State<TermsAndPermissionsScreen> {
   bool _agreed = false;
+
+  Future<void> _requestPermissions() async {
+    await Permission.microphone.request();
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const SetupSecretaryScreen()),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -153,13 +169,8 @@ class _TermsAndPermissionsScreenState extends State<TermsAndPermissionsScreen> {
                 minimumSize: const Size.fromHeight(52),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              onPressed: _agreed
-                  ? () => Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (_) => const SetupSecretaryScreen()),
-                      )
-                  : null,
-              child: const Text('متابعة لإعداد السكرتير', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
+              onPressed: _agreed ? _requestPermissions : null,
+              child: const Text('متابعة وإعطاء الأذونات', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
             )
           ],
         ),
@@ -168,7 +179,7 @@ class _TermsAndPermissionsScreenState extends State<TermsAndPermissionsScreen> {
   }
 }
 
-// 2. شاشة إعداد السكرتير
+// 2. شاشة إعداد السكرتير والمستخدم
 class SetupSecretaryScreen extends StatefulWidget {
   const SetupSecretaryScreen({super.key});
 
@@ -178,6 +189,7 @@ class SetupSecretaryScreen extends StatefulWidget {
 
 class _SetupSecretaryScreenState extends State<SetupSecretaryScreen> {
   String _gender = 'male';
+  String _userGender = 'male';
   final TextEditingController _nameController = TextEditingController(text: 'أحمد');
 
   final List<String> _maleNames = ['أحمد', 'كريم', 'عمر', 'محمود', 'يوسف'];
@@ -199,6 +211,7 @@ class _SetupSecretaryScreenState extends State<SetupSecretaryScreen> {
     await prefs.setBool('is_first_time', false);
     await prefs.setString('secretary_name', _nameController.text);
     await prefs.setBool('is_male', _gender == 'male');
+    await prefs.setBool('is_user_male', _userGender == 'male');
 
     if (mounted) {
       Navigator.pushReplacement(
@@ -207,6 +220,7 @@ class _SetupSecretaryScreenState extends State<SetupSecretaryScreen> {
           builder: (_) => MainDashboard(
             secretaryName: _nameController.text,
             isMale: _gender == 'male',
+            isUserMale: _userGender == 'male',
           ),
         ),
       );
@@ -246,7 +260,7 @@ class _SetupSecretaryScreenState extends State<SetupSecretaryScreen> {
               ),
               const SizedBox(height: 15),
               Text(
-                _gender == 'male' ? 'سكرتير خاص (رجل)' : 'سكرتيرة خاصة (سيدة)',
+                _gender == 'male' ? 'صوت السكرتير (رجل)' : 'صوت السكرتيرة (سيدة)',
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1B2A4A)),
               ),
               const SizedBox(height: 25),
@@ -304,7 +318,35 @@ class _SetupSecretaryScreenState extends State<SetupSecretaryScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 25),
+              const SizedBox(height: 20),
+              const Divider(),
+              const Align(
+                alignment: Alignment.centerRight,
+                child: Text('نوع المستخدم (صاحب الهاتف):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: RadioListTile<String>(
+                      title: const Text('ذكر (يا فندم)'),
+                      value: 'male',
+                      groupValue: _userGender,
+                      onChanged: (v) => setState(() => _userGender = v!),
+                    ),
+                  ),
+                  Expanded(
+                    child: RadioListTile<String>(
+                      title: const Text('أنثى (يا أستاذة)'),
+                      value: 'female',
+                      groupValue: _userGender,
+                      onChanged: (v) => setState(() => _userGender = v!),
+                    ),
+                  ),
+                ],
+              ),
+              const Divider(),
+              const SizedBox(height: 15),
               const Align(
                 alignment: Alignment.centerRight,
                 child: Text('اختر اسماً أو اكتب اسماً مخصصاً:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
@@ -355,12 +397,18 @@ class _SetupSecretaryScreenState extends State<SetupSecretaryScreen> {
   }
 }
 
-// 3. اللوحة الرئيسية مع ميزات التنبيه المستمر، الهز، التذكير المسبق
+// 3. اللوحة الرئيسية مع ميزات التنبيه المستمر، الهز، والتذكير المسبق
 class MainDashboard extends StatefulWidget {
   final String secretaryName;
   final bool isMale;
+  final bool isUserMale;
 
-  const MainDashboard({super.key, required this.secretaryName, required this.isMale});
+  const MainDashboard({
+    super.key,
+    required this.secretaryName,
+    required this.isMale,
+    this.isUserMale = true,
+  });
 
   @override
   State<MainDashboard> createState() => _MainDashboardState();
@@ -398,7 +446,7 @@ class _MainDashboardState extends State<MainDashboard> {
       double gZ = event.z / 9.81;
       double gForce = sqrt(gX * gX + gY * gY + gZ * gZ);
 
-      if (gForce > 2.5) { // حد شدة الهز
+      if (gForce > 2.2) { // حد شدة الهز
         if (!_isListening) {
           _listenVoiceCommand();
         }
@@ -481,16 +529,17 @@ class _MainDashboardState extends State<MainDashboard> {
     } catch (_) {}
 
     if (widget.isMale) {
-      await _tts.setPitch(0.55);
+      await _tts.setPitch(0.40); // نبرة عميقة لصوت رجالي
       await _tts.setSpeechRate(0.38);
     } else {
-      await _tts.setPitch(1.30);
+      await _tts.setPitch(1.20);
       await _tts.setSpeechRate(0.48);
     }
 
+    String userTitle = widget.isUserMale ? "يا فندم" : "يا أستاذة";
     String greetingText = widget.isMale
-        ? "أهلاً بك يا فندم. أنا سكرتيرك ${widget.secretaryName}، هُز الهاتف في أي وقت لأكون في خدمتك."
-        : "أهلاً بك يا فندم. أنا سكرتيرتك ${widget.secretaryName}، هُز الهاتف في أي وقت لأكون في خدمتك.";
+        ? "أهلاً بك $userTitle. أنا سكرتيرك ${widget.secretaryName}، هُز الهاتف في أي وقت لأكون في خدمتك."
+        : "أهلاً بك $userTitle. أنا سكرتيرتك ${widget.secretaryName}، هُز الهاتف في أي وقت لأكون في خدمتك.";
 
     await _tts.speak(greetingText);
   }
@@ -517,41 +566,56 @@ class _MainDashboardState extends State<MainDashboard> {
     }
   }
 
+  // 🧠 معالجة الأوامر بالقاموس المرن الموسّع
   void _processSmartVoiceCommand(String rawCommand) async {
+    String userTitle = widget.isUserMale ? "يا فندم" : "يا أستاذة";
     String cmd = rawCommand.toLowerCase();
 
     bool isCalledByName = cmd.contains(widget.secretaryName.toLowerCase()) || cmd.contains("يا سكرتير") || cmd.contains("يا سكرتيرة");
 
-    if (cmd.contains("صلوات") || cmd.contains("صلاة")) {
+    // 1. التنقل بين الواجهات
+    List<String> prayerKeywords = ["صلوات", "صلاة", "مواقيت", "اذان", "أذان"];
+    List<String> diaryKeywords = ["يوميات", "مفكرة", "تدوين", "خواطر"];
+    List<String> eventKeywords = ["مناسبات", "مناسبة", "عيد", "ذكرى"];
+
+    if (prayerKeywords.any((k) => cmd.contains(k))) {
       setState(() => _currentIndex = 2);
-      await _tts.speak("تم الانتقال لمواقيت الصلاة يا فندم.");
+      await _tts.speak("تم الانتقال لمواقيت الصلاة $userTitle.");
       return;
-    } else if (cmd.contains("يوميات")) {
+    } else if (diaryKeywords.any((k) => cmd.contains(k))) {
       setState(() => _currentIndex = 1);
-      await _tts.speak("تم فتح قسم اليوميات.");
+      await _tts.speak("تم فتح قسم اليوميات $userTitle.");
       return;
-    } else if (cmd.contains("مناسبات")) {
+    } else if (eventKeywords.any((k) => cmd.contains(k))) {
       setState(() => _currentIndex = 3);
-      await _tts.speak("تم الانتقال للمناسبات السنوية.");
+      await _tts.speak("تم الانتقال للمناسبات السنوية $userTitle.");
       return;
     }
 
-    bool isAlarm = cmd.contains("منبه") || cmd.contains("فكرني") || cmd.contains("تذكير") || cmd.contains("سجل عندك") || cmd.contains("ورايا");
+    // 2. القاموس الذكي للمنابهات والتذكير
+    List<String> alarmKeywords = [
+      "منبه", "فكرني", "تذكير", "سجل عندك", "ورايا", "ذكرني", "صحيني", "ظبط", "اضبط", "تحديد"
+    ];
+
+    bool isAlarm = alarmKeywords.any((keyword) => cmd.contains(keyword));
 
     if (isAlarm) {
       DateTime targetDate = DateTime.now();
-      if (cmd.contains("بكره") || cmd.contains("غدا")) {
+
+      if (cmd.contains("بكره") || cmd.contains("غدا") || cmd.contains("غداً")) {
         targetDate = targetDate.add(const Duration(days: 1));
+      } else if (cmd.contains("بعد بكره") || cmd.contains("بعد غد")) {
+        targetDate = targetDate.add(const Duration(days: 2));
       }
 
       int hour = 5; // الساعة 5 افتراضياً
       Map<String, int> numberMap = {
-        "خمسة": 5, "خمسه": 5, "5": 5,
         "واحدة": 1, "واحده": 1, "1": 1,
         "اتنين": 2, "2": 2, "تلاتة": 3, "3": 3,
-        "اربعة": 4, "4": 4, "ستة": 6, "6": 6,
-        "سبعة": 7, "7": 7, "تمانية": 8, "8": 8,
+        "اربعة": 4, "4": 4, "خمسة": 5, "خمسه": 5, "5": 5,
+        "ستة": 6, "6": 6, "سبعة": 7, "7": 7, "تمانية": 8, "8": 8,
         "تسعة": 9, "9": 9, "عشرة": 10, "10": 10,
+        "حدعشر": 11, "11": 11, "اتناشر": 12, "12": 12,
       };
 
       numberMap.forEach((key, val) {
@@ -563,7 +627,7 @@ class _MainDashboardState extends State<MainDashboard> {
 
       String cleanTitle = rawCommand;
       List<String> keywordsToStrip = [
-        "اظبطلي", "منبه", "على", "الساعه", "الساعة", "فكرني", "تذكير", "سجل عندك", "اني", "ورايا", "عايز", widget.secretaryName
+        "اظبطلي", "منبه", "على", "الساعه", "الساعة", "فكرني", "تذكير", "سجل عندك", "اني", "ورايا", "عايز", "ذكرني", "صحيني", widget.secretaryName
       ];
 
       for (var word in keywordsToStrip) {
@@ -592,14 +656,14 @@ class _MainDashboardState extends State<MainDashboard> {
       _saveData();
       _scheduleContinuousAlarm(cleanTitle, scheduledDateTime);
 
-      await _tts.speak("علم وتم التنفيذ يا فندم! تم تسجيل: $cleanTitle، في تمام الساعة ${hour > 12 ? hour - 12 : hour}.");
+      await _tts.speak("علم وتم التنفيذ $userTitle! تم تسجيل: $cleanTitle، في تمام الساعة ${hour > 12 ? hour - 12 : hour}.");
       return;
     }
 
     if (isCalledByName) {
-      await _tts.speak("نعم يا فندم! أنا أسمعك، كيف يمكنني مساعدتك؟");
+      await _tts.speak("نعم $userTitle! أنا أسمعك، كيف يمكنني مساعدتك؟");
     } else {
-      await _tts.speak("تم الاستماع لك: $rawCommand.");
+      await _tts.speak("تم الاستماع لك $userTitle: $rawCommand.");
     }
   }
 
@@ -617,6 +681,7 @@ class _MainDashboardState extends State<MainDashboard> {
 
   void _startAlarmLoop(String taskTitle) {
     bool isStopped = false;
+    String userTitle = widget.isUserMale ? "يا فندم" : "يا أستاذة";
 
     Timer.periodic(const Duration(seconds: 7), (loopTimer) async {
       if (isStopped) {
@@ -625,8 +690,8 @@ class _MainDashboardState extends State<MainDashboard> {
       }
 
       String speakAlert = widget.isMale
-          ? "يا فندم، أنا سكرتيرك ${widget.secretaryName}. حان الآن موعد: $taskTitle!"
-          : "يا فندم، أنا سكرتيرتك ${widget.secretaryName}. حان الآن موعد: $taskTitle!";
+          ? "$userTitle، أنا سكرتيرك ${widget.secretaryName}. حان الآن موعد: $taskTitle!"
+          : "$userTitle، أنا سكرتيرتك ${widget.secretaryName}. حان الآن موعد: $taskTitle!";
 
       await _tts.speak(speakAlert);
     });
@@ -650,7 +715,7 @@ class _MainDashboardState extends State<MainDashboard> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'يا فندم، حان الآن موعد:\n"$taskTitle"',
+                '$userTitle، حان الآن موعد:\n"$taskTitle"',
                 style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 15),
@@ -972,6 +1037,7 @@ class _MainDashboardState extends State<MainDashboard> {
     String formattedSelectedDate = DateFormat('yyyy-MM-dd').format(_selectedDate);
     String currentTimeStr = DateFormat('hh:mm a').format(DateTime.now());
     var dayTasks = _tasks.where((t) => t['date'] == formattedSelectedDate).toList();
+    String userTitle = widget.isUserMale ? "يا فندم" : "يا أستاذة";
 
     return SingleChildScrollView(
       child: Column(
@@ -1004,7 +1070,7 @@ class _MainDashboardState extends State<MainDashboard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('مرحباً بك يا فندم! 👋', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                      Text('مرحباً بك $userTitle! 👋', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
                       const SizedBox(height: 4),
                       Text('الوقت الحالي: $currentTimeStr', style: const TextStyle(fontSize: 13, color: Color(0xFFC5A059), fontWeight: FontWeight.w600)),
                       const SizedBox(height: 4),
