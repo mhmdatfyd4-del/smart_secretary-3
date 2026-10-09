@@ -34,7 +34,7 @@ jobs:
         run: flutter create . --platforms=android --org com.example
 
       - name: Build APK
-        run: flutter build apk --release --no-pub --vrbose
+        run: flutter build apk --release --no-pub --v
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
